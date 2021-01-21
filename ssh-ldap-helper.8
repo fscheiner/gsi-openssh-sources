@@ -1,0 +1,79 @@
+.\" $OpenBSD: ssh-ldap-helper.8,v 1.1 2010/02/10 23:20:38 markus Exp $
+.\"
+.\" Copyright (c) 2010 Jan F. Chadima.  All rights reserved.
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: April 29 2010 $
+.Dt SSH-LDAP-HELPER 8
+.Os
+.Sh NAME
+.Nm ssh-ldap-helper
+.Nd sshd helper program for ldap support
+.Sh SYNOPSIS
+.Nm ssh-ldap-helper
+.Op Fl devw
+.Op Fl f Ar file
+.Op Fl s Ar user
+.Sh DESCRIPTION
+.Nm
+is used by
+.Xr sshd 1
+to access keys provided by an LDAP.
+.Nm
+is disabled by default and can only be enabled in the
+sshd configuration file
+.Pa /etc/ssh/sshd_config
+by setting
+.Cm AuthorizedKeysCommand
+to
+.Dq /usr/libexec/ssh-ldap-wrapper .
+.Pp
+.Nm
+is not intended to be invoked by the user, but from
+.Xr sshd 8 via
+.Xr ssh-ldap-wrapper .
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl d
+Set the debug mode; 
+.Nm
+prints all logs to stderr instead of syslog.
+.It Fl e
+Implies \-w;
+.Nm
+halts if it encounters an unknown item in the ldap.conf file.
+.It Fl f
+.Nm
+uses this file as the ldap configuration file instead of /etc/ssh/ldap.conf (default).
+.It Fl s
+.Nm
+prints out the user's keys to stdout and exits.
+.It Fl v
+Implies \-d;
+increases verbosity.
+.It Fl w
+.Nm
+writes warnings about unknown items in the ldap.conf configuration file.
+.El
+.Sh SEE ALSO
+.Xr sshd 8 ,
+.Xr sshd_config 5 ,
+.Xr ssh-ldap.conf 5 ,
+.Sh HISTORY
+.Nm
+first appeared in
+OpenSSH 5.5 + PKA-LDAP .
+.Sh AUTHORS
+.An Jan F. Chadima Aq jchadima@redhat.com
