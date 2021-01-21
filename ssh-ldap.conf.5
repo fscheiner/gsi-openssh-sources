@@ -1,0 +1,385 @@
+.\" $OpenBSD: ssh-ldap.conf.5,v 1.1 2010/02/10 23:20:38 markus Exp $
+.\"
+.\" Copyright (c) 2010 Jan F. Chadima.  All rights reserved.
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: may 12 2010 $
+.Dt SSH-LDAP.CONF 5
+.Os
+.Sh NAME
+.Nm ssh-ldap.conf
+.Nd configuration file for ssh-ldap-helper
+.Sh SYNOPSIS
+.Nm /etc/ssh/ldap.conf
+.Sh DESCRIPTION
+.Xr ssh-ldap-helper 8
+reads configuration data from
+.Pa /etc/ssh/ldap.conf
+(or the file specified with
+.Fl f
+on the command line).
+The file contains keyword-argument pairs, one per line.
+Lines starting with
+.Ql #
+and empty lines are interpreted as comments.
+.Pp
+The value starts with the first non-blank character after 
+the keyword's name, and terminates at the end of the line, 
+or at the last sequence of blanks before the end of the line.
+Quoting values that contain blanks 
+may be incorrect, as the quotes would become part of the value.
+The possible keywords and their meanings are as follows (note that
+keywords are case-insensitive, and arguments, on a case by case basis, may be case-sensitive).
+.Bl -tag -width Ds
+.It Cm URI
+The argument(s) are in the form
+.Pa ldap[si]://[name[:port]]
+and specify the URI(s) of an LDAP server(s) to which the
+.Xr ssh-ldap-helper 8 
+should connect. The URI scheme may be any of
+.Dq ldap ,
+.Dq ldaps 
+or
+.Dq ldapi ,
+which refer to LDAP over TCP, LDAP over SSL (TLS) and LDAP
+over IPC (UNIX domain sockets), respectively.
+Each server's name can be specified as a
+domain-style name or an IP address literal.  Optionally, the
+server's name can followed by a ':' and the port number the LDAP
+server is listening on.  If no port number is provided, the default
+port for the scheme is used (389 for ldap://, 636 for ldaps://).
+For LDAP over IPC, name is the name of the socket, and no port
+is required, nor allowed; note that directory separators must be 
+URL-encoded, like any other characters that are special to URLs; 
+A space separated list of URIs may be provided.
+There is no default.
+.It Cm Base
+Specifies the default base Distinguished Name (DN) to use when performing ldap operations.
+The base must be specified as a DN in LDAP format.
+There is no default.
+.It Cm BindDN
+Specifies the default BIND DN to use when connecting to the ldap server.
+The bind DN must be specified as a Distinguished Name in LDAP format.
+There is no default.
+.It Cm BindPW
+Specifies the default password to use when connecting to the ldap server via
+.Cm BindDN .
+There is no default.
+.It Cm RootBindDN
+Intentionaly does nothing. Recognized for compatibility reasons.
+.It Cm Host
+The argument(s) specifies the name(s) of an LDAP server(s) to which the
+.Xr ssh-ldap-helper 8
+should connect.  Each server's name can be specified as a
+domain-style name or an IP address and optionally followed by a ':' and
+the port number the ldap server is listening on.  A space-separated
+list of hosts may be provided.
+There is no default.
+.Cm Host
+is deprecated in favor of
+.Cm URI .
+.It Cm Port
+Specifies the default port used when connecting to LDAP servers(s).
+The port may be specified as a number.
+The default port is 389 for ldap:// or 636 for ldaps:// respectively.
+.Cm Port
+is deprecated in favor of
+.Cm URI .
+.It Cm Scope
+Specifies the starting point of an LDAP search and the depth from the base DN to which the search should descend.
+There are three options (values) that can be assigned to the
+.Cm Scope parameter:
+.Dq base ,
+.Dq one
+and
+.Dq subtree .
+Alias for the subtree is
+.Dq sub .
+The value
+.Dq base
+is used to indicate searching only the entry at the base DN, resulting in only that entry being returned (keeping in mind that it also has to meet the search filter criteria!).
+The value
+.Dq one
+is used to indicate searching all entries one level under the base DN, but not including the base DN and not including any entries under that one level under the base DN.
+The value
+.Dq subtree
+is used to indicate searching of all entries at all levels under and including the specified base DN.
+The default is
+.Dq subtree .
+.It Cm Deref
+Specifies how alias dereferencing is done when performing a search. There are four
+possible values that can be assigned to the
+.Cm Deref
+parameter:
+.Dq never ,
+.Dq searching ,
+.Dq finding ,
+and
+.Dq always .
+The value
+.Dq never
+means that the aliases are never dereferenced.
+The value
+.Dq searching
+means that the aliases are dereferenced in subordinates of the base object, but
+not in locating the base object of the search.
+The value
+.Dq finding
+means that the aliases are only dereferenced when locating the base object of the search.
+The value
+.Dq always
+means that the aliases are dereferenced both in searching and in locating the base object
+of the search.
+The default is
+.Dq never .
+.It Cm TimeLimit
+Specifies a time limit (in seconds) to use when performing searches.
+The number should be a non-negative integer. A
+.Cm TimeLimit
+of zero (0) specifies that the search time is unlimited. Please note that the server
+may still apply any server-side limit on the duration of a search operation.
+The default value is 10.
+.It Cm TimeOut
+Is an aliast to
+.Cm TimeLimit .
+.It Cm Bind_TimeLimit
+Specifies the timeout (in seconds) after which the poll(2)/select(2)
+following a connect(2) returns in case of no activity.
+The default value is 10.
+.It Cm Network_TimeOut
+Is an alias to
+.Cm Bind_TimeLimit .
+.It Cm Ldap_Version
+Specifies what version of the LDAP protocol should be used.
+The allowed values are 2 or 3. The default is 3.
+.It Cm Version
+Is an alias to
+.Cm Ldap_Version .
+.It Cm Bind_Policy
+Specifies the policy to use for reconnecting to an unavailable LDAP server. There are 2 available values:
+.Dq hard
+and
+.Dq soft.
+.Dq hard has 2 aliases
+.Dq hard_open
+and
+.Dq hard_init .
+The value
+.Dq hard
+means that reconects that the
+.Xr ssh-ldap-helper 8
+tries to reconnect to the LDAP server 5 times before failure. There is exponential backoff before retrying.
+The value
+.Dq soft
+means that
+.Xr ssh-ldap-helper 8
+fails immediately when it cannot connect to the LDAP seerver.
+The deault is
+.Dq hard .
+.It Cm SSLPath
+Specifies the path to the X.509 certificate database.
+There is no default.
+.It Cm SSL
+Specifies whether to use SSL/TLS or not.
+There are three allowed values:
+.Dq yes ,
+.Dq no
+and
+.Dq start_tls
+Both
+.Dq true
+and
+.Dq on
+are the aliases for
+.Dq yes .
+.Dq false
+and
+.Dq off
+are the aliases for
+.Dq no .
+If
+.Dq start_tls
+is specified then StartTLS is used rather than raw LDAP over SSL.
+The default for ldap:// is
+.Dq start_tls ,
+for ldaps://
+.Dq yes
+and
+.Dq no
+for the ldapi:// .
+In case of host based configuration the default is
+.Dq start_tls .
+.It Cm Referrals
+Specifies if the client should automatically follow referrals returned
+by LDAP servers.
+The value can be or
+.Dq yes
+or
+.Dq no .
+.Dq true
+and
+.Dq on
+are the aliases for
+.Dq yes .
+.Dq false
+and
+.Dq off
+are the aliases for
+.Dq no .
+The default is yes.
+.It Cm Restart
+Specifies whether the LDAP client library should restart the select(2) system call when interrupted.
+The value can be or
+.Dq yes
+or
+.Dq no .
+.Dq true
+and
+.Dq on
+are the aliases for
+.Dq yes .
+.Dq false
+and
+.Dq off
+are the aliases for
+.Dq no .
+The default is yes.
+.It Cm TLS_CheckPeer
+Specifies what checks to perform on server certificates in a TLS session,
+if any. The value
+can be specified as one of the following keywords:
+.Dq never ,
+.Dq hard ,
+.Dq demand ,
+.Dq allow
+and
+.Dq try .
+.Dq true ,
+.Dq on
+and
+.Dq yes
+are aliases for
+.Dq hard .
+.Dq false ,
+.Dq off
+and
+.Dq no
+are the aliases for
+.Dq never .
+The value
+.Dq never
+means that the client will not request or check any server certificate.
+The value
+.Dq allow
+means that the server certificate is requested. If no certificate is provided,
+the session proceeds normally. If a bad certificate is provided, it will
+be ignored and the session proceeds normally.
+The value
+.Dq try
+means that the server certificate is requested. If no certificate is provided,
+the session proceeds normally. If a bad certificate is provided,
+the session is immediately terminated.
+The value
+.Dq demand
+means that the server certificate is requested. If no
+certificate is provided, or a bad certificate is provided, the session
+is immediately terminated.
+The value
+.Dq hard
+is the same as
+.Dq demand .
+It requires an SSL connection. In the case of the plain conection the
+session is immediately terminated.
+The default is
+.Dq hard .
+.It Cm TLS_ReqCert
+Is an alias for 
+.Cm TLS_CheckPeer .
+.It Cm TLS_CACertFile
+Specifies the file that contains certificates for all of the Certificate
+Authorities the client will recognize.
+There is no default.
+.It Cm TLS_CACert
+Is an alias for
+.Cm TLS_CACertFile .
+.It Cm TLS_CACertDIR
+Specifies the path of a directory that contains Certificate Authority
+certificates in separate individual files. The
+.Cm TLS_CACert
+is always used before
+.Cm TLS_CACertDir .
+The specified directory must be managed with the OpenSSL c_rehash utility.
+There is no default.
+.It Cm TLS_Ciphers
+Specifies acceptable cipher suite and preference order.
+The value should be a cipher specification for OpenSSL,
+e.g.,
+.Dq HIGH:MEDIUM:+SSLv2 .
+The default is
+.Dq ALL .
+.It Cm TLS_Cipher_Suite
+Is an alias for
+.Cm TLS_Ciphers .
+.It Cm TLS_Cert
+Specifies the file that contains the client certificate.
+There is no default.
+.It Cm TLS_Certificate
+Is an alias for
+.Cm TLS_Cert .
+.It Cm TLS_Key
+Specifies the file that contains the private key that matches the certificate
+stored in the
+.Cm TLS_Cert
+file. Currently, the private key must not be protected with a password, so
+it is of critical importance that the key file is protected carefully.
+There is no default.
+.It Cm TLS_RandFile
+Specifies the file to obtain random bits from when /dev/[u]random is
+not available. Generally set to the name of the EGD/PRNGD socket.
+The environment variable RANDFILE can also be used to specify the filename.
+There is no default.
+.It Cm LogDir
+Specifies the directory used for logging by the LDAP client library.
+There is no default.
+.It Cm Debug
+Specifies the debug level used for logging by the LDAP client library.
+There is no default.
+.It Cm SSH_Filter
+Specifies the user filter applied on the LDAP search.
+The default is no filter.
+.It Cm AccountClass
+Specifies the LDAP class used to find user accounts.
+The default is posixAccount.
+.It Cm search_format
+Specifies the user format of search string in LDAP substituting %u for user name
+and %f for additional ssh filter
+.Cm SSH_Filter
+(optional).
+The default value is (&(objectclass=%c)(objectclass=ldapPublicKey)(uid=%u)%f)
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa  /etc/ssh/ldap.conf
+Ldap configuration file for
+.Xr ssh-ldap-helper 8 .
+.El
+.Sh "SEE ALSO"
+.Xr ldap.conf 5 ,
+.Xr ssh-ldap-helper 8
+.Sh HISTORY
+.Nm
+first appeared in
+OpenSSH 5.5 + PKA-LDAP .
+.Sh AUTHORS
+.An Jan F. Chadima Aq jchadima@redhat.com

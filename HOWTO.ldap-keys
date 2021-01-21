@@ -1,0 +1,122 @@
+
+HOW TO START
+
+1) configure LDAP server
+  * Use LDAP server documentation
+2) add appropriate LDAP schema
+  * For OpenLDAP or SunONE Use attached schema, otherwise you have to create it. 
+  * LDAP user entry
+        User entry:
+	- attached to the 'ldapPublicKey' objectclass
+	- attached to the 'posixAccount' objectclass
+	- with a filled 'sshPublicKey' attribute 
+3) insert users into LDAP
+  * Use LDAP Tree management tool as useful
+  * Entry in the LDAP server must respect 'posixAccount' and 'ldapPublicKey' which are defined in core.schema and the additionnal lpk.schema.
+  * Example:
+	dn: uid=captain,ou=commanders,dc=enterprise,dc=universe
+	objectclass: top
+	objectclass: person
+	objectclass: organizationalPerson
+	objectclass: posixAccount
+	objectclass: ldapPublicKey
+	description: Jonathan Archer
+	userPassword: Porthos
+	cn: onathan Archer
+	sn: onathan Archer
+	uid: captain
+	uidNumber: 1001
+	gidNumber: 1001
+	homeDirectory: /home/captain
+	sshPublicKey: ssh-rss AAAAB3.... =captain@universe
+	sshPublicKey: command="kill -9 1" ssh-rss AAAAM5...
+4) on the ssh side set in sshd_config
+  * Set up the backend
+	AuthorizedKeysCommand /usr/libexec/openssh/ssh-ldap-wrapper
+	AuthorizedKeysCommandUser <appropriate user to run LDAP>
+  * Do not forget to set
+	PubkeyAuthentication yes
+  * Swith off unnecessary auth methods
+5) confugure ldap.conf
+  * Default ldap.conf is placed in /etc/ssh
+  * The configuration style is the same as other ldap based aplications
+6) if necessary edit ssh-ldap-wrapper
+  * There is a possibility to change ldap.conf location
+  * There are some debug options
+  * Example
+	/usr/libexec/openssh -s -f /etc/ldap.conf -w -d >> /tmp/ldapdebuglog.txt
+7) Configure SELinux boolean which allows ldap-helper to bind ldap server
+  Run this command
+  # setsebool -P authlogin_nsswitch_use_ldap on
+
+HOW TO MIGRATE FROM LPK
+
+1) goto HOW TO START 4) .... the ldap schema is the same
+
+2) convert the group requests to the appropriate LDAP requests
+
+HOW TO SOLVE PROBLEMS
+
+1) use debug in sshd
+  * /usr/sbin/sshd -d -d -d -d
+2) use debug in ssh-ldap-helper
+  * ssh-ldap-helper -d -d -d -d -s <username>
+3) use tcpdump ... other ldap client etc.
+
+HOW TO CONFIGURE SSH FOR OTHER LDAP CONFIGURATION / SERVER /SCHEMA
+
+You can adjust search format string in /etc/ldap.conf using
+ 1) SSH_Filter option to limit results for only specified users
+    (this appends search condition after original query)
+ 2) Search_Format option to define your own search string using expansion
+    characters %u for username, %c for objectclass and %f for above mentioned filter.
+
+Example:
+Search_Format (&(objectclass=posixAccount)(objectclass=ldapPublicKey)(uid=%u)%f)
+
+ADVANTAGES
+
+1) Blocking an user account can be done directly from LDAP (if sshd is using PubkeyAuthentication + AuthorizedKeysCommand with ldap only).
+
+DISADVANTAGES
+
+1)  LDAP must be well configured, getting the public key of some user is not a problem, but if anonymous LDAP 
+  allows write to users dn, somebody could replace some user's public key by his own and impersonate some 
+  of your users in all your server farm -- be VERY CAREFUL.
+2) With incomplete PKI the MITM attack when sshd is requesting the public key, could lead to a compromise of your servers allowing login 
+  as the impersonated user.
+3) If LDAP server is down there may be no fallback on passwd auth.
+  
+MISC.
+  
+1) todo
+  * Possibility to reuse the ssh-ldap-helper.
+  * Tune the LDAP part to accept  all possible LDAP configurations.
+
+2) differences from original lpk
+  * No LDAP code in sshd.
+  * Support for various LDAP platforms and configurations.
+  * LDAP is configured in separate ldap.conf file.
+
+3) docs/link 
+  * http://pacsec.jp/core05/psj05-barisani-en.pdf
+  * http://fritz.potsdam.edu/projects/openssh-lpk/
+  * http://fritz.potsdam.edu/projects/sshgate/
+  * http://dev.inversepath.com/trac/openssh-lpk
+  * http://lam.sf.net/ ( http://lam.sourceforge.net/documentation/supportedSchemas.htm )
+
+4) contributors/ideas/greets
+  - Eric AUGE <eau@phear.org>
+  - Andrea Barisani <andrea@inversepath.com>
+  - Falk Siemonsmeier.
+  - Jacob Rief.
+  - Michael Durchgraf.
+  - frederic peters.
+  - Finlay dobbie.
+  - Stefan Fisher.
+  - Robin H. Johnson.
+  - Adrian Bridgett.
+
+5) Author
+    Jan F. Chadima <jchadima@redhat.com>
+
