@@ -2579,6 +2579,16 @@ sshpkt_putb(struct ssh *ssh, const struct sshbuf *b)
 	return sshbuf_putb(ssh->state->outgoing_packet, b);
 }
 
+void
+ssh_packet_put_char(struct ssh *ssh, int value)
+{
+	u_char ch = value;
+	int r;
+
+	if ((r = sshpkt_put_u8(ssh, ch)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+}
+
 int
 sshpkt_put_u8(struct ssh *ssh, u_char val)
 {
@@ -2838,4 +2848,18 @@ void *
 ssh_packet_get_send_context(struct ssh *ssh)
 {
         return ssh->state->send_context;
+}
+
+void *
+ssh_packet_get_string(struct ssh *ssh, u_int *length_ptr)
+{
+	int r;
+	size_t len;
+	u_char *val;
+
+	if ((r = sshpkt_get_string(ssh, &val, &len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	if (length_ptr != NULL)
+		*length_ptr = (u_int)len;
+	return val;
 }

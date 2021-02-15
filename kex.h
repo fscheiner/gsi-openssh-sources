@@ -169,6 +169,8 @@ struct kex {
 	char    *gss_host;
 	char	*gss_client;
 #endif
+	char	*client_version_string;
+	char	*server_version_string;
 	char	*failed_choice;
 	int	(*verify_host_key)(struct sshkey *, struct ssh *);
 	struct sshkey *(*load_host_public_key)(int, int, struct ssh *);
@@ -213,6 +215,7 @@ int	 kex_send_kexinit(struct ssh *);
 int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
 int	 kex_input_ext_info(int, u_int32_t, struct ssh *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, const struct sshbuf *);
+int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int, const BIGNUM *);
 int	 kex_send_newkeys(struct ssh *);
 int	 kex_start_rekex(struct ssh *);
 
@@ -252,6 +255,10 @@ int	 kex_kem_sntrup4591761x25519_dec(struct kex *, const struct sshbuf *,
 
 int	 kex_dh_keygen(struct kex *);
 int	 kex_dh_compute_key(struct kex *, BIGNUM *, struct sshbuf *);
+
+int	 kex_dh_hash(int, const char *, const char *,
+    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+    const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char *, size_t *);
 
 int	 kexgex_hash(int, const struct sshbuf *, const struct sshbuf *,
     const struct sshbuf *, const struct sshbuf *, const struct sshbuf *,

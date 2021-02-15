@@ -135,6 +135,7 @@ int	 ssh_packet_process_incoming(struct ssh *, const char *buf, u_int len);
 int      ssh_packet_read_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
 int      ssh_packet_read_poll_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
 
+void	*ssh_packet_get_string(struct ssh *, u_int *length_ptr);
 const void *ssh_packet_get_string_ptr(struct ssh *, u_int *length_ptr);
 void     ssh_packet_disconnect(struct ssh *, const char *fmt, ...)
 	__attribute__((format(printf, 2, 3)))
@@ -196,6 +197,7 @@ int	sshpkt_msg_ignore(struct ssh *, u_int);
 
 int	sshpkt_put(struct ssh *ssh, const void *v, size_t len);
 int	sshpkt_putb(struct ssh *ssh, const struct sshbuf *b);
+void     ssh_packet_put_char(struct ssh *, int ch);
 int	sshpkt_put_u8(struct ssh *ssh, u_char val);
 int	sshpkt_put_u32(struct ssh *ssh, u_int32_t val);
 int	sshpkt_put_u64(struct ssh *ssh, u_int64_t val);

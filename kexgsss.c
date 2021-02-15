@@ -54,6 +54,224 @@ extern ServerOptions options;
 int
 kexgss_server(struct ssh *ssh)
 {
+	OM_uint32 maj_status, min_status;
+	
+	/* 
+	 * Some GSSAPI implementations use the input value of ret_flags (an
+ 	 * output variable) as a means of triggering mechanism specific 
+ 	 * features. Initializing it to zero avoids inadvertently 
+ 	 * activating this non-standard behaviour.
+	 */
+
+	OM_uint32 ret_flags = 0;
+	gss_buffer_desc gssbuf, recv_tok, msg_tok;
+	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
+	Gssctxt *ctxt = NULL;
+	u_int slen, klen, kout;
+	u_char *kbuf;
+	DH *dh;
+	int min = -1, max = -1, nbits = -1;
+	int cmin = -1, cmax = -1; /* client proposal */
+	BIGNUM *shared_secret = NULL;
+	BIGNUM *dh_client_pub = NULL;
+	int type = 0;
+	gss_OID oid;
+	char *mechs;
+	u_char hash[SSH_DIGEST_MAX_LENGTH];
+	size_t hashlen;
+	const BIGNUM *p, *g, *pub_key;
+
+	/* Initialise GSSAPI */
+
+	/* If we're rekeying, privsep means that some of the private structures
+	 * in the GSSAPI code are no longer available. This kludges them back
+	 * into life
+	 */
+	if (!ssh_gssapi_oid_table_ok()) 
+		if ((mechs = ssh_gssapi_server_mechanisms()))
+			free(mechs);
+
+	debug2("%s: Identifying %s", __func__, ssh->kex->name);
+	oid = ssh_gssapi_id_kex(NULL, ssh->kex->name, ssh->kex->kex_type);
+	if (oid == GSS_C_NO_OID)
+	   fatal("Unknown gssapi mechanism");
+
+	debug2("%s: Acquiring credentials", __func__);
+
+	if (GSS_ERROR(PRIVSEP(ssh_gssapi_server_ctx(&ctxt, oid)))) {
+		kex_gss_send_error(ctxt, ssh);
+		fatal("Unable to acquire credentials for the server");
+	}
+
+	switch (ssh->kex->kex_type) {
+	case KEX_GSS_GRP1_SHA1:
+		dh = dh_new_group1();
+		break;
+	case KEX_GSS_GRP14_SHA1:
+	case KEX_GSS_GRP14_SHA256:
+		dh = dh_new_group14();
+		break;
+	case KEX_GSS_GRP16_SHA512:
+		dh = dh_new_group16();
+		break;
+	default:
+		fatal("%s: Unexpected KEX type %d", __func__, ssh->kex->kex_type);
+	}
+
+	dh_gen_key(dh, ssh->kex->we_need * 8);
+
+	do {
+		debug("Wait SSH2_MSG_GSSAPI_INIT");
+		type = ssh_packet_read(ssh);
+		switch(type) {
+		case SSH2_MSG_KEXGSS_INIT:
+			if (dh_client_pub != NULL) 
+				fatal("Received KEXGSS_INIT after initialising");
+			recv_tok.value = ssh_packet_get_string(ssh, &slen);
+			recv_tok.length = slen; 
+
+			if ((dh_client_pub = BN_new()) == NULL)
+				fatal("dh_client_pub == NULL");
+
+			sshpkt_get_bignum2(ssh, &dh_client_pub);
+
+			/* Send SSH_MSG_KEXGSS_HOSTKEY here, if we want */
+			break;
+		case SSH2_MSG_KEXGSS_CONTINUE:
+			recv_tok.value = ssh_packet_get_string(ssh, &slen);
+			recv_tok.length = slen; 
+			break;
+		default:
+			sshpkt_disconnect(ssh,
+			    "Protocol error: didn't expect packet type %d",
+			    type);
+		}
+
+		maj_status = PRIVSEP(ssh_gssapi_accept_ctx(ctxt, &recv_tok, 
+		    &send_tok, &ret_flags));
+
+		free(recv_tok.value);
+
+		if (maj_status != GSS_S_COMPLETE && send_tok.length == 0)
+			fatal("Zero length token output when incomplete");
+
+		if (dh_client_pub == NULL)
+			fatal("No client public key");
+		
+		if (maj_status & GSS_S_CONTINUE_NEEDED) {
+			debug("Sending GSSAPI_CONTINUE");
+			sshpkt_start(ssh, SSH2_MSG_KEXGSS_CONTINUE);
+			sshpkt_put_string(ssh, send_tok.value, send_tok.length);
+			sshpkt_send(ssh);
+			gss_release_buffer(&min_status, &send_tok);
+		}
+	} while (maj_status & GSS_S_CONTINUE_NEEDED);
+
+	if (GSS_ERROR(maj_status)) {
+		kex_gss_send_error(ctxt, ssh);
+		if (send_tok.length > 0) {
+			sshpkt_start(ssh, SSH2_MSG_KEXGSS_CONTINUE);
+			sshpkt_put_string(ssh, send_tok.value, send_tok.length);
+			sshpkt_send(ssh);
+		}
+		sshpkt_disconnect(ssh, "GSSAPI Key Exchange handshake failed");
+	}
+
+	if (!(ret_flags & GSS_C_MUTUAL_FLAG))
+		fatal("Mutual Authentication flag wasn't set");
+
+	if (!(ret_flags & GSS_C_INTEG_FLAG))
+		fatal("Integrity flag wasn't set");
+	
+	if (!dh_pub_is_valid(dh, dh_client_pub))
+		sshpkt_disconnect(ssh, "bad client public DH value");
+
+	klen = DH_size(dh);
+	kbuf = xmalloc(klen); 
+	kout = DH_compute_key(kbuf, dh_client_pub, dh);
+	if ((int)kout < 0)
+		fatal("DH_compute_key: failed");
+
+	shared_secret = BN_new();
+	if (shared_secret == NULL)
+		fatal("kexgss_server: BN_new failed");
+
+	if (BN_bin2bn(kbuf, kout, shared_secret) == NULL)
+		fatal("kexgss_server: BN_bin2bn failed");
+
+	memset(kbuf, 0, klen);
+	free(kbuf);
+
+	DH_get0_key(dh, &pub_key, NULL);
+	hashlen = sizeof(hash);
+	switch (ssh->kex->kex_type) {
+	case KEX_GSS_GRP1_SHA1:
+	case KEX_GSS_GRP14_SHA1:
+	case KEX_GSS_GRP14_SHA256:
+	case KEX_GSS_GRP16_SHA512:
+		kex_dh_hash(ssh->kex->hash_alg,
+		    ssh->kex->client_version_string, ssh->kex->server_version_string,
+		    sshbuf_ptr(ssh->kex->peer), sshbuf_len(ssh->kex->peer),
+		    sshbuf_ptr(ssh->kex->my), sshbuf_len(ssh->kex->my),
+		    NULL, 0, /* Change this if we start sending host keys */
+		    dh_client_pub, pub_key, shared_secret,
+		    hash, &hashlen
+		);
+		break;
+	default:
+		fatal("%s: Unexpected KEX type %d", __func__, ssh->kex->kex_type);
+	}
+
+	BN_clear_free(dh_client_pub);
+
+	if (ssh->kex->session_id == NULL) {
+		ssh->kex->session_id_len = hashlen;
+		ssh->kex->session_id = xmalloc(ssh->kex->session_id_len);
+		memcpy(ssh->kex->session_id, hash, ssh->kex->session_id_len);
+	}
+
+	gssbuf.value = hash;
+	gssbuf.length = hashlen;
+
+	if (GSS_ERROR(PRIVSEP(ssh_gssapi_sign(ctxt,&gssbuf,&msg_tok))))
+		fatal("Couldn't get MIC");
+
+	sshpkt_start(ssh, SSH2_MSG_KEXGSS_COMPLETE);
+	sshpkt_put_bignum2(ssh, pub_key);
+	sshpkt_put_string(ssh, msg_tok.value,msg_tok.length);
+
+	if (send_tok.length != 0) {
+		ssh_packet_put_char(ssh, 1); /* true */
+		sshpkt_put_string(ssh, send_tok.value, send_tok.length);
+	} else {
+		ssh_packet_put_char(ssh, 0); /* false */
+	}
+	sshpkt_send(ssh);
+
+	gss_release_buffer(&min_status, &send_tok);
+	gss_release_buffer(&min_status, &msg_tok);
+
+	if (gss_kex_context == NULL)
+		gss_kex_context = ctxt;
+	else 
+		ssh_gssapi_delete_ctx(&ctxt);
+
+	DH_free(dh);
+
+	kex_derive_keys_bn(ssh, hash, hashlen, shared_secret);
+	BN_clear_free(shared_secret);
+	kex_send_newkeys(ssh);
+
+	/* If this was a rekey, then save out any delegated credentials we
+	 * just exchanged.  */
+	if (options.gss_store_rekey)
+		ssh_gssapi_rekey_creds();
+	return 0;
+}
+
+int
+kexgss_server_orig(struct ssh *ssh)
+{
 	struct kex *kex = ssh->kex;
 	OM_uint32 maj_status, min_status;
 
