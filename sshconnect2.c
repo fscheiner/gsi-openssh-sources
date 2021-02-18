@@ -80,8 +80,6 @@
 #endif
 
 /* import */
-extern char *client_version_string;
-extern char *server_version_string;
 extern Options options;
 
 /*
@@ -286,8 +284,6 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port)
 #endif /* WITH_OPENSSL */
 	ssh->kex->kex[KEX_C25519_SHA256] = kex_gen_client;
 	ssh->kex->kex[KEX_KEM_SNTRUP4591761X25519_SHA512] = kex_gen_client;
-	kex->client_version_string=client_version_string;
-	kex->server_version_string=server_version_string;
 	ssh->kex->verify_host_key=&verify_host_key_callback;
 
 #if defined(GSSAPI) && defined(WITH_OPENSSL)

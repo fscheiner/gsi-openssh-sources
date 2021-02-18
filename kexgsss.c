@@ -209,6 +209,8 @@ kexgss_server(struct ssh *ssh)
 	case KEX_GSS_GRP14_SHA1:
 	case KEX_GSS_GRP14_SHA256:
 	case KEX_GSS_GRP16_SHA512:
+		ssh->kex->client_version_string = sshbuf_dup_string(ssh->kex->client_version);
+		ssh->kex->server_version_string = sshbuf_dup_string(ssh->kex->server_version);
 		kex_dh_hash(ssh->kex->hash_alg,
 		    ssh->kex->client_version_string, ssh->kex->server_version_string,
 		    sshbuf_ptr(ssh->kex->peer), sshbuf_len(ssh->kex->peer),
